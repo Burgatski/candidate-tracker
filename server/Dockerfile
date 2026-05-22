@@ -1,13 +1,14 @@
-FROM golang:1.22-alpine AS builder
-ARG CGO_ENABLED=0
+FROM golang:1.25-alpine AS builder
 WORKDIR /app
-
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+RUN go build -o server .
 
-RUN go build -o ./server
-
-FROM scratch
-COPY --from=builder /app/server /server
-ENTRYPOINT ["/server"]
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+COPY --from=builder /app/server .
+COPY --from=builder /app/data.json .
+EXPOSE 8080
+ENTRYPOINT ["./server"]

@@ -1,0 +1,23 @@
+services:
+  server:
+    build: ./server
+    ports:
+      - "8080:8080"
+    volumes:
+      - db-data:/app/data
+    environment:
+      - DB_PATH=/app/data/candidates.db
+      - PORT=8080
+
+  client:
+    build:
+      context: ./client
+      args:
+        VITE_API_URL: http://localhost:8080
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+
+volumes:
+  db-data:
