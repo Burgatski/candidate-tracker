@@ -1,0 +1,12 @@
+{
+  "name": "candidate-tracker",
+  "private": true,
+  "scripts": {
+    "start": "concurrently --names \"server,client\" --prefix-colors \"blue,green\" \"npm run server\" \"npm run client\"",
+    "server": "cd server && go run .",
+    "client": "cd client && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
