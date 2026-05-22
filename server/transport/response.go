@@ -16,20 +16,27 @@ type errResponse struct {
 	Errors []string `json:"errors"`
 }
 
-func writeOK(w http.ResponseWriter, log *slog.Logger, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	if status != http.StatusOK {
-		w.WriteHeader(status)
-	}
-	if err := json.NewEncoder(w).Encode(okResponse{Status: status, Data: data}); err != nil {
-		log.Error("writeOK encode", slog.String("err", err.Error()))
+type responder struct {
+	w   http.ResponseWriter
+	log *slog.Logger
+}
+
+func respond(w http.ResponseWriter, log *slog.Logger) responder {
+	return responder{w: w, log: log}
+}
+
+func (r responder) ok(status int, data any) {
+	r.w.Header().Set("Content-Type", "application/json")
+	r.w.WriteHeader(status)
+	if err := json.NewEncoder(r.w).Encode(okResponse{Status: status, Data: data}); err != nil {
+		r.log.Error("encode ok response", slog.String("err", err.Error()))
 	}
 }
 
-func writeError(w http.ResponseWriter, log *slog.Logger, status int, errs ...string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(errResponse{Status: status, Errors: errs}); err != nil {
-		log.Error("writeError encode", slog.String("err", err.Error()))
+func (r responder) err(status int, errs ...string) {
+	r.w.Header().Set("Content-Type", "application/json")
+	r.w.WriteHeader(status)
+	if err := json.NewEncoder(r.w).Encode(errResponse{Status: status, Errors: errs}); err != nil {
+		r.log.Error("encode error response", slog.String("err", err.Error()))
 	}
 }

@@ -7,8 +7,27 @@ import (
 	"fmt"
 	"strings"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/remotely-works/frontend-challenge/server/domain"
 )
+
+const candidateSelect = `SELECT id, first_name, last_name, email, phone, picture FROM candidates`
+
+func OpenDB(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, fmt.Errorf("open db: %w", err)
+	}
+	db.SetMaxOpenConns(1) // SQLite: one writer at a time
+	if _, err := db.Exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("pragma: %w", err)
+	}
+	return db, nil
+}
+
+// Repository
 
 type SQLiteRepo struct {
 	db *sql.DB
@@ -18,6 +37,11 @@ func New(db *sql.DB) *SQLiteRepo {
 	return &SQLiteRepo{db: db}
 }
 
+func scanRow(scan func(...any) error) (*domain.Candidate, error) {
+	c := &domain.Candidate{Skills: []string{}}
+	return c, scan(&c.ID, &c.FirstName, &c.LastName, &c.Email, &c.Phone, &c.Picture)
+}
+
 func (r *SQLiteRepo) List(ctx context.Context, offset, limit int) ([]*domain.Candidate, int, error) {
 	var total int
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM candidates`).Scan(&total); err != nil {
@@ -25,7 +49,7 @@ func (r *SQLiteRepo) List(ctx context.Context, offset, limit int) ([]*domain.Can
 	}
 
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, first_name, last_name, email, phone, picture FROM candidates ORDER BY id LIMIT ? OFFSET ?`,
+		candidateSelect+` ORDER BY id LIMIT ? OFFSET ?`,
 		limit, offset,
 	)
 	if err != nil {
@@ -36,8 +60,8 @@ func (r *SQLiteRepo) List(ctx context.Context, offset, limit int) ([]*domain.Can
 	var candidates []*domain.Candidate
 	var ids []int
 	for rows.Next() {
-		c := &domain.Candidate{Skills: []string{}}
-		if err := rows.Scan(&c.ID, &c.FirstName, &c.LastName, &c.Email, &c.Phone, &c.Picture); err != nil {
+		c, err := scanRow(rows.Scan)
+		if err != nil {
 			return nil, 0, err
 		}
 		candidates = append(candidates, c)
@@ -63,10 +87,7 @@ func (r *SQLiteRepo) List(ctx context.Context, offset, limit int) ([]*domain.Can
 }
 
 func (r *SQLiteRepo) FindByID(ctx context.Context, id int) (*domain.Candidate, error) {
-	c := &domain.Candidate{Skills: []string{}}
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, first_name, last_name, email, phone, picture FROM candidates WHERE id = ?`, id,
-	).Scan(&c.ID, &c.FirstName, &c.LastName, &c.Email, &c.Phone, &c.Picture)
+	c, err := scanRow(r.db.QueryRowContext(ctx, candidateSelect+` WHERE id = ?`, id).Scan)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
@@ -85,10 +106,7 @@ func (r *SQLiteRepo) FindByID(ctx context.Context, id int) (*domain.Candidate, e
 }
 
 func (r *SQLiteRepo) FindByEmail(ctx context.Context, email string) (*domain.Candidate, error) {
-	c := &domain.Candidate{Skills: []string{}}
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, first_name, last_name, email, phone, picture FROM candidates WHERE email = ?`, email,
-	).Scan(&c.ID, &c.FirstName, &c.LastName, &c.Email, &c.Phone, &c.Picture)
+	c, err := scanRow(r.db.QueryRowContext(ctx, candidateSelect+` WHERE email = ?`, email).Scan)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
@@ -158,8 +176,7 @@ func (r *SQLiteRepo) Delete(ctx context.Context, id int) error {
 	if err != nil {
 		return fmt.Errorf("delete: %w", err)
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
+	if n, _ := res.RowsAffected(); n == 0 {
 		return domain.ErrNotFound
 	}
 	return nil

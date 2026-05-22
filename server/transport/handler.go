@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,16 +12,23 @@ import (
 	"strings"
 
 	"github.com/remotely-works/frontend-challenge/server/domain"
-	"github.com/remotely-works/frontend-challenge/server/service"
 )
+
+type candidateUseCase interface {
+	List(ctx context.Context, page int) (*domain.CandidateList, error)
+	GetByID(ctx context.Context, id int) (*domain.Candidate, error)
+	Create(ctx context.Context, c *domain.Candidate) error
+	Update(ctx context.Context, id int, c *domain.Candidate) error
+	Delete(ctx context.Context, id int) error
+}
 
 type Handler struct {
 	log *slog.Logger
-	svc *service.CandidateService
+	svc candidateUseCase
 	mux *http.ServeMux
 }
 
-func NewHandler(log *slog.Logger, svc *service.CandidateService) *Handler {
+func NewHandler(log *slog.Logger, svc candidateUseCase) *Handler {
 	h := &Handler{log: log, svc: svc, mux: http.NewServeMux()}
 	h.mux.HandleFunc("GET /candidates", h.list)
 	h.mux.HandleFunc("POST /candidates", h.create)
@@ -33,6 +41,8 @@ func NewHandler(log *slog.Logger, svc *service.CandidateService) *Handler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.mux.ServeHTTP(w, r)
 }
+
+// Request DTO
 
 type candidateRequest struct {
 	FirstName string   `json:"first_name"`
@@ -85,104 +95,111 @@ func (r candidateRequest) toCandidate() *domain.Candidate {
 	}
 }
 
+// Handlers
+
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
+	resp := respond(w, h.log)
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	result, err := h.svc.List(r.Context(), page)
 	if err != nil {
 		h.log.Error("list", slog.String("err", err.Error()))
-		writeError(w, h.log, http.StatusInternalServerError, "internal error")
+		resp.err(http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeOK(w, h.log, http.StatusOK, result)
+	resp.ok(http.StatusOK, result)
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
+	resp := respond(w, h.log)
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeError(w, h.log, http.StatusBadRequest, "invalid id")
+		resp.err(http.StatusBadRequest, "invalid id")
 		return
 	}
 	candidate, err := h.svc.GetByID(r.Context(), id)
 	if errors.Is(err, domain.ErrNotFound) {
-		writeError(w, h.log, http.StatusNotFound, "not found")
+		resp.err(http.StatusNotFound, "not found")
 		return
 	}
 	if err != nil {
 		h.log.Error("get", slog.String("err", err.Error()))
-		writeError(w, h.log, http.StatusInternalServerError, "internal error")
+		resp.err(http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeOK(w, h.log, http.StatusOK, candidate)
+	resp.ok(http.StatusOK, candidate)
 }
 
 func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
+	resp := respond(w, h.log)
 	var req candidateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, h.log, http.StatusBadRequest, "invalid request body")
+		resp.err(http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if errs := req.validate(); len(errs) > 0 {
-		writeError(w, h.log, http.StatusBadRequest, errs...)
+		resp.err(http.StatusBadRequest, errs...)
 		return
 	}
 	c := req.toCandidate()
 	if err := h.svc.Create(r.Context(), c); err != nil {
 		if errors.Is(err, domain.ErrDuplicateEmail) {
-			writeError(w, h.log, http.StatusBadRequest, "email already exists")
+			resp.err(http.StatusBadRequest, "email already exists")
 			return
 		}
 		h.log.Error("create", slog.String("err", err.Error()))
-		writeError(w, h.log, http.StatusInternalServerError, "internal error")
+		resp.err(http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeOK(w, h.log, http.StatusCreated, c)
+	resp.ok(http.StatusCreated, c)
 }
 
 func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	resp := respond(w, h.log)
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeError(w, h.log, http.StatusBadRequest, "invalid id")
+		resp.err(http.StatusBadRequest, "invalid id")
 		return
 	}
 	var req candidateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, h.log, http.StatusBadRequest, "invalid request body")
+		resp.err(http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if errs := req.validate(); len(errs) > 0 {
-		writeError(w, h.log, http.StatusBadRequest, errs...)
+		resp.err(http.StatusBadRequest, errs...)
 		return
 	}
 	c := req.toCandidate()
 	if err := h.svc.Update(r.Context(), id, c); err != nil {
 		switch {
 		case errors.Is(err, domain.ErrNotFound):
-			writeError(w, h.log, http.StatusNotFound, "not found")
+			resp.err(http.StatusNotFound, "not found")
 		case errors.Is(err, domain.ErrDuplicateEmail):
-			writeError(w, h.log, http.StatusBadRequest, "email already exists")
+			resp.err(http.StatusBadRequest, "email already exists")
 		default:
 			h.log.Error("update", slog.String("err", err.Error()))
-			writeError(w, h.log, http.StatusInternalServerError, "internal error")
+			resp.err(http.StatusInternalServerError, "internal error")
 		}
 		return
 	}
-	writeOK(w, h.log, http.StatusOK, c)
+	resp.ok(http.StatusOK, c)
 }
 
 func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	resp := respond(w, h.log)
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		writeError(w, h.log, http.StatusBadRequest, "invalid id")
+		resp.err(http.StatusBadRequest, "invalid id")
 		return
 	}
 	if err := h.svc.Delete(r.Context(), id); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			writeError(w, h.log, http.StatusNotFound, "not found")
+			resp.err(http.StatusNotFound, "not found")
 			return
 		}
 		h.log.Error("delete", slog.String("err", err.Error()))
-		writeError(w, h.log, http.StatusInternalServerError, "internal error")
+		resp.err(http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeOK(w, h.log, http.StatusOK, nil)
+	resp.ok(http.StatusOK, nil)
 }

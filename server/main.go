@@ -1,17 +1,17 @@
 package main
 
 import (
-	"context"
-	"database/sql"
-	"errors"
 	_ "embed"
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/rs/cors"
-	_ "modernc.org/sqlite"
 
 	"github.com/remotely-works/frontend-challenge/server/config"
 	"github.com/remotely-works/frontend-challenge/server/repository"
@@ -25,22 +25,18 @@ import (
 var seedData []byte
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	cfg := config.Load()
 
-	db, err := sql.Open("sqlite", cfg.DBPath)
+	db, err := repository.OpenDB(cfg.DBPath)
 	if err != nil {
 		log.Error("open db", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
 	defer db.Close()
-
-	db.SetMaxOpenConns(1) // SQLite supports one writer at a time
-	db.ExecContext(ctx, `PRAGMA journal_mode=WAL`)
-	db.ExecContext(ctx, `PRAGMA foreign_keys=ON`)
 
 	if err := repository.Migrate(ctx, db); err != nil {
 		log.Error("migrate", slog.String("err", err.Error()))
@@ -82,7 +78,9 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	if err := srv.Shutdown(context.Background()); err != nil {
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Error("shutdown", slog.String("err", err.Error()))
 	}
 	<-done
