@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Build output
+client/dist/
+client/dist-ssr/
+
+# Vite / TypeScript cache
+client/.vite/
+*.tsbuildinfo
+
+# Go build artifacts
+server/server
+server/*.db
+*.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
