@@ -11,8 +11,6 @@ body {
   line-height: 1.5;
 }
 
-/* ── Layout ─────────────────────────────────────────────────── */
-
 .page {
   max-width: 1100px;
   margin: 0 auto;
@@ -44,8 +42,6 @@ h1 {
   gap: 8px;
   align-items: center;
 }
-
-/* ── Buttons ─────────────────────────────────────────────────── */
 
 .btn-primary,
 .btn-secondary,
@@ -91,8 +87,6 @@ h1 {
   font-weight: 500;
 }
 .back-link:hover { text-decoration: underline; }
-
-/* ── Table ───────────────────────────────────────────────────── */
 
 .table-container {
   background: #fff;
@@ -145,8 +139,6 @@ h1 {
 
 .text-muted { color: #6b7280; }
 
-/* ── Skills ──────────────────────────────────────────────────── */
-
 .skills-list {
   display: flex;
   flex-wrap: wrap;
@@ -166,8 +158,6 @@ h1 {
   background: #f3f4f6;
   color: #6b7280;
 }
-
-/* ── Pagination ──────────────────────────────────────────────── */
 
 .pagination {
   display: flex;
@@ -193,8 +183,6 @@ h1 {
   color: #6b7280;
   font-size: 0.875rem;
 }
-
-/* ── Candidate detail ────────────────────────────────────────── */
 
 .detail-card {
   display: flex;
@@ -240,8 +228,6 @@ h1 {
   color: #9ca3af;
   font-weight: 600;
 }
-
-/* ── Form ────────────────────────────────────────────────────── */
 
 .candidate-form {
   background: #fff;
@@ -352,8 +338,6 @@ h1 {
 
 .server-errors p + p { margin-top: 4px; }
 
-/* ── Confirm dialog ──────────────────────────────────────────── */
-
 .dialog-overlay {
   position: fixed;
   inset: 0;
@@ -385,8 +369,6 @@ h1 {
   gap: 10px;
 }
 
-/* ── States ──────────────────────────────────────────────────── */
-
 .state-message {
   text-align: center;
   padding: 80px 20px;
@@ -395,8 +377,6 @@ h1 {
 }
 
 .state-error { color: #dc2626; }
-
-/* ── Responsive ──────────────────────────────────────────────── */
 
 @media (max-width: 640px) {
   .form-row { grid-template-columns: 1fr; }

@@ -2,6 +2,88 @@
 
 This challenge consists of building a very simple app for a managing candidates. There is no frontend provided, but a small in-memory backend in Go is provided. Part of the task will be changing that backend to not be in-memory anymore.
 
+---
+
+## Running the project
+
+### With Docker (recommended)
+
+Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose.
+
+```bash
+docker-compose up --build
+```
+
+| Service | URL |
+|---------|-----|
+| Frontend (React) | http://localhost:3000 |
+| Backend API | http://localhost:8080 |
+
+The SQLite database is stored in a named volume (`db-data`) and persists across container restarts.
+
+To stop and remove containers:
+
+```bash
+docker-compose down
+```
+
+To also remove the database volume:
+
+```bash
+docker-compose down -v
+```
+
+---
+
+### Without Docker (local development)
+
+**Prerequisites**
+
+- [Go 1.25+](https://go.dev/dl/)
+- [Node.js 20+](https://nodejs.org/)
+
+**Install dependencies** (first run only):
+
+```bash
+npm install          # root — installs concurrently
+cd client && npm install
+```
+
+**Start both server and client:**
+
+```bash
+npm start
+```
+
+This runs the Go backend on `:8080` and the Vite dev server on `:5173` simultaneously.
+
+| Service | URL |
+|---------|-----|
+| Frontend (React, hot-reload) | http://localhost:5173 |
+| Backend API | http://localhost:8080 |
+
+**Run backend only:**
+
+```bash
+cd server && go run .
+```
+
+**Run frontend only** (expects the backend to be running on `:8080`):
+
+```bash
+cd client && npm run dev
+```
+
+---
+
+### Running tests
+
+```bash
+cd server && go test ./...
+```
+
+---
+
 ### What if I do not know Go?
 
 Go is fairly easy to read, but if you don't feel confident with Go you can roll your own in your preferred stack (but please, include instructions on how to run it).
